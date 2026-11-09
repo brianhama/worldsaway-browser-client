@@ -1,0 +1,35 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": [
+      "ES2023",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "rootDir": ".",
+    "outDir": "dist",
+    "strict": true,
+    "useDefineForClassFields": false,
+    "noEmitOnError": true,
+    "sourceMap": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "types": [
+      "node"
+    ]
+  },
+  "include": [
+    "public/**/*.ts",
+    "server/**/*.ts",
+    "native/**/*.ts",
+    "scripts/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "release",
+    "tests"
+  ]
+}

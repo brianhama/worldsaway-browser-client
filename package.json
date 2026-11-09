@@ -1,0 +1,35 @@
+{
+  "name": "browser-client",
+  "version": "0.3.0",
+  "private": true,
+  "type": "module",
+  "description": "TypeScript browser client and TCP/Tcl bridge for WorldsAway-compatible worlds",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsx scripts/build.ts",
+    "typecheck": "tsc --noEmit",
+    "start": "node dist/server/index.js",
+    "dev": "npm run build && node --watch dist/server/index.js",
+    "test": "npm run build && node --test tests/portable/*.test.mjs",
+    "check": "npm run typecheck && npm run build && tsx scripts/check.ts",
+    "release:prepare": "npm run check && node --test tests/portable/*.test.mjs && tsx scripts/release.ts",
+    "tcl:setup": "tsx scripts/setup-tcl.ts"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3"
+  },
+  "license": "MIT",
+  "files": [
+    "dist/",
+    "server/*.tcl",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md",
+    "README.md",
+    "docs/licenses/",
+    "!dist/**/*.map"
+  ]
+}

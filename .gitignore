@@ -1,0 +1,57 @@
+# Dependencies, compiled output, and downloaded/built Tcl runtime.
+node_modules/
+dist/
+.runtime/
+/release/
+*.tsbuildinfo
+
+# Test coverage and local tool caches.
+coverage/
+.nyc_output/
+.cache/
+.npm/
+.vercel/
+
+# Local configuration and connection credentials. Keep the safe template.
+.env
+.env.*
+!.env.example
+*.iv
+*.pem
+*.key
+
+# Runtime output and editor/OS temporary files.
+*.log
+*.pid
+*.pid.lock
+*.swp
+*.swo
+*~
+.DS_Store
+._*
+Thumbs.db
+.idea/
+__pycache__/
+*.pyc
+
+# Supplied client caches and proprietary UI extracts are local inputs.
+/assets/
+/public/native-icons/
+/public/native-font*
+/public/client.ico
+
+# Local research, world screenshots, and deployment state.
+/design-qa.md
+/docs/evidence/
+/docs/screenshots/
+/docs/*validation*.md
+/docs/validation-*.md
+/docs/*research*.md
+/docs/*deployment*.json
+/docs/feature-coverage.md
+/docs/remaining-native-parity.md
+/docs/tcl-contract.md
+
+# Local corpus tests depend on separately supplied sibling projects.
+# The self-contained tests/portable/ suite remains part of the repository.
+/tests/*.test.mjs
