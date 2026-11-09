@@ -47,7 +47,7 @@ const OPTIONS: Readonly<Record<string, [
 ][]>> = Object.freeze({
     '103.exitDir': [[0, 'North'], [1, 'East'], [2, 'South'], [3, 'West']],
     '1688.facing': [[0, 'Facing 0'], [1, 'Facing 1'], [2, 'Facing 2'], [3, 'Facing 3']],
-    '1594.gesture': [['0xF00B', 'Wave'], ['0xF00C', 'Bow'], ['0xF00D', 'Shrug'], ['0xF00F', 'Show'], ['jump_up', 'Jump'], ['stomp_internal_leg', 'Stomp']],
+    '1594.gesture': [['0xF00B', 'Wave'], ['0xF00C', 'Bow'], ['0xF00D', 'Shrug'], ['0xF00F', 'Present'], ['jump_up', 'Jump'], ['stomp_internal_leg', 'React']],
     '1616.mood': [[0, 'Normal'], [1, 'Happy'], [2, 'Sad'], [3, 'Mad'], [4, 'Asleep']],
     '1916.type': [[57, 'Avatar health'], [55, 'Who is in here?'], [56, 'Where am I?'], [58, 'What time is it?'], [59, 'Tokens in hand and pocket'], [14, 'Total online time'], [15, 'Reset online time'], [192, 'Where is everyone?'], [502, 'Helpers on duty'], [60, 'Disable ESP'], [61, 'Enable ESP'], [90, 'Allow followers'], [91, 'Refuse followers'], [93, 'Go on duty'], [94, 'Go off duty'], [251, 'Disable ESP mail'], [252, 'Enable ESP mail'], [500, 'Announce logins'], [501, 'Silent login'], [503, 'Disable gestures'], [504, 'Enable gestures']],
     '171.newstate': [[0, 'Stop leading'], [1, 'Private tour'], [2, 'Open tour']],

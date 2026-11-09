@@ -58,7 +58,7 @@ for (const [id, name] of [[15390, 'toolbar-strip'], [15391, 'controls-strip']]) 
   const leaf = leaves.find((item: any) => item.path[0] === 2 && item.path[1] === id); if (!leaf) throw new Error(`Missing RT_BITMAP ${id}`);
   const image = dib(leaf.data); await writeFile(`${output}/${name}.png`, png(image.width, image.height, image.pixels)); manifest.resources.push({ file: `${name}.png`, resourcePath: leaf.path, width: image.width, height: image.height, sha256: createHash('sha256').update(leaf.data).digest('hex') });
   const rows = id === 15391 ? 21 : 3, columns = id === 15391 ? 6 : 8, prefix = id === 15391 ? 'control' : 'speech';
-  const labels = id === 15391 ? ['west','north','south','east','ghost','avatar','neutral','happy','sad','angry','wave','bow','shrug','show','jump','stomp','turn-left','turn-right','return','clock','tokens'] : ['speak','think','esp'];
+  const labels = id === 15391 ? ['west','north','south','east','ghost','avatar','neutral','happy','sad','angry','wave','bow','shrug','present','jump','react','turn-left','turn-right','turn-around','clock','tokens'] : ['speak','think','esp'];
   manifest.buttons ??= [];
   for (let row = 0; row < rows; row++) {
     const button = crop(image, 0, row * 28, 29, 28), stem = `${prefix}-${String(row).padStart(2,'0')}`;

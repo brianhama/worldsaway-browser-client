@@ -48,13 +48,21 @@ import { bridgeRequest, prepareLogin } from './connection.js';
 import { canRegister, rememberedConnection, submitRegistration } from './registration.js';
 import { prepareSeatRequest } from './seating.js';
 import { installNativeButtonImages } from './native-buttons.js';
+import { nativeToolbarTurn } from './native-toolbar.js';
 import { escapeHtml as esc, objectName, objectClass, objectParent, isActor, inventoryObjects, safeUrl, noticeText, displayFields, slotName, projectAcknowledgedFacing } from './model.js';
 const $ = <T extends Element = any>(selector: string): T => document.querySelector<T>(selector)!;
+const clientBanner = $<HTMLElement>('#client-banner');
+function updateClientBannerHeight() {
+    document.documentElement.style.setProperty('--client-banner-height', `${clientBanner.offsetHeight}px`);
+}
+updateClientBannerHeight();
+new ResizeObserver(updateClientBannerHeight).observe(clientBanner);
 const ALTAWAY_LAUNCHER_URL = 'https://altaway.xyz/';
 let state: ApplicationState = { status: 'disconnected', objects: [], avatars: [], history: [] }, panel = 'room', selectedNoid: number | null = null, source: EventSource | null = null, lastSeq = 0, currentAction: ActionDescriptor | null = null, actionDialogGeneration = 0, toastTimer: ReturnType<typeof setTimeout> | undefined, config: any = {}, classMetadata: any = null, filter = '';
 let approach: ObjectApproach, payments: PaymentPreparation, npc: NPCController, tcl: WorldTcl, preparationGeneration = 0;
 let runtimeActions = new Map(ACTIONS.map((action) => [action.id, action])), runtimeClassActions = new Map(), metadataKey = '', metadataPending = false;
 let connectionMode: 'login' | 'register' = 'login';
+let sendingMessage = false;
 let preferences: Preferences = { sound: false, animation: !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches, pixelated: true, names: false, advanced: false, ignored: '' };
 let savedAnimationPreference = false;
 try {
@@ -415,17 +423,20 @@ function applyState(next: WorldState) {
     $('#world-meta').textContent = online ? `${objectsInRoom()} nearby · ${state.resources?.received ?? 0} resources` : 'Choose your world. Be yourself.';
     $('#actor-badge').textContent = self ? `${objectName(self)} · ${objectClass(self) === 22 ? 'Ghost' : 'Avatar'}` : state.avatar || '';
     $('#sidebar-footer-text').textContent = online ? `${state.avatar} · ${state.worldName || 'AltAway'}` : 'Original world. Browser window.';
+    const seated = objectClass(state.objects.find(object => Number(object.noid) === objectParent(self))) === 53;
     $('#chat-text').disabled = !online || busy;
-    $('#chat-send').disabled = !online || busy;
     for (const button of document.querySelectorAll<HTMLButtonElement>('.native-toolbar>button')) {
         const ghost = objectClass(self) === 22;
         button.hidden = (button.dataset.quick === 'ghost' && ghost) || (button.dataset.quick === 'materialize' && !ghost);
-        button.disabled = !online || busy || (button.dataset.quick === 'ghost' && ghost) || (button.dataset.quick === 'materialize' && !ghost) || (Boolean(button.dataset.gesture || button.dataset.mood) && ghost);
+        button.disabled = !online || busy || (button.dataset.quick === 'ghost' && ghost) || (button.dataset.quick === 'materialize' && !ghost)
+            || (Boolean(button.dataset.gesture || button.dataset.mood || button.dataset.turn) && ghost)
+            || (Boolean(button.dataset.turn) && !nativeToolbarTurn(state, button.dataset.turn!))
+            || (seated && Boolean(button.dataset.gesture) && button.dataset.gesture !== '0xF00B');
     }
     channelChange();
     const exits = state.region?.fields?.validExits ?? [];
     for (const button of document.querySelectorAll<HTMLButtonElement>('.native-toolbar [data-exit]'))
-        button.disabled = !online || Number(exits[Number(button.dataset.exit)]) === 0;
+        button.disabled = !online || busy || !Number(exits[Number(button.dataset.exit)]);
     if (selectedNoid !== null && !state.objects.some((o) => Number(o.noid) === selectedNoid))
         selectedNoid = null;
     payments.ingestState(state);
@@ -839,6 +850,10 @@ else if (target.dataset.quick)
     quickAction(target.dataset.quick);
 else if (target.dataset.exit !== undefined)
     send(103, { exitDir: Number(target.dataset.exit) }, 0);
+else if (target.dataset.turn) {
+    const request = nativeToolbarTurn(state, target.dataset.turn);
+    if (request) send(request.id!, request.fields, request.noid);
+}
 else if (target.dataset.mood)
     send(1616, { mood: Number(target.dataset.mood) }, state.actorNoid);
 else if (target.dataset.gesture)
@@ -857,22 +872,27 @@ function channelChange() {
     const ghost = objectClass(actor()) === 22, select = $('#chat-channel');
     if (ghost && ['say', 'think'].includes(select.value))
         select.value = 'esp';
-    const recipient = ghost || select.value === 'esp';
+    const recipient = ghost || ['esp', 'mail'].includes(select.value);
     $('label[for="chat-to"]').hidden = !recipient;
     $('.native-to-combo').hidden = !recipient;
     $('#chat-to').required = recipient;
     $('#chat-text').placeholder = '';
-    for (const button of document.querySelectorAll<HTMLButtonElement>('[data-native-channel="say"],[data-native-channel="think"]'))
-        button.disabled = ghost;
+    for (const button of document.querySelectorAll<HTMLButtonElement>('[data-native-channel]'))
+        button.disabled = state.status !== 'connected' || Number(state.tcl?.blockCount) > 0 || sendingMessage
+            || (ghost && ['say', 'think'].includes(button.dataset.nativeChannel!));
 }
 $('#chat-channel').addEventListener('change', channelChange);
-$('#chat-send').addEventListener('click', () => { if (!['esp', 'mail'].includes($('#chat-channel').value))
-    $('#chat-channel').value = 'say'; channelChange(); });
+$('#chat-text').addEventListener('keydown', (event: KeyboardEvent) => {
+    if (event.key === 'Enter' && !event.isComposing) {
+        event.preventDefault();
+        $('#chat-form').requestSubmit();
+    }
+});
 $('#chat-form').addEventListener('submit', async (event: any) => {
     event.preventDefault();
     if (!requireConnected())
         return;
-    if (Number(state.tcl?.blockCount) > 0)
+    if (Number(state.tcl?.blockCount) > 0 || sendingMessage)
         return;
     const text = $('#chat-text').value.trim(), to = $('#chat-to').value.trim(), channel = $('#chat-channel').value;
     if (!text)
@@ -883,7 +903,8 @@ $('#chat-form').addEventListener('submit', async (event: any) => {
         return;
     }
     const room = ['say', 'think'].includes(channel), id = room ? 72 : channel === 'esp' ? 109 : 244, fields = room ? { type: channel === 'think' ? 1 : 0, dummyfielda: 0, text } : channel === 'esp' ? { type: 0, dummyfielda: 0, to, text } : { to, text };
-    $('#chat-send').disabled = true;
+    sendingMessage = true;
+    channelChange();
     try {
         await api('/api/action', { noid: channel === 'mail' ? 0 : state.actorNoid, id, fields: coerceActionValues(lookupAction(id)!, fields) });
         $('#chat-text').value = '';
@@ -894,7 +915,8 @@ $('#chat-form').addEventListener('submit', async (event: any) => {
         notify(error.message, true);
     }
     finally {
-        $('#chat-send').disabled = false;
+        sendingMessage = false;
+        channelChange();
         $('#chat-text').focus();
     }
 });
@@ -1025,7 +1047,7 @@ function installNativeChrome() {
         const name = image.dataset.nativeIcon ?? '';
         const control = image.parentElement!;
         if (control.closest('.native-toolbar')) {
-            const left: Record<string, number> = { west: 0, north: 1, south: 2, east: 3, ghost: 4, materialize: 4 }, center: Record<string, number> = { normal: 0, happy: 1, sad: 2, mad: 3, wave: 4, bow: 5, shrug: 6, show: 7, jump: 8, stomp: 9 }, right: Record<string, number> = { drop: 0, pockets: 1, inventory: 2, time: 3, tokens: 4 };
+            const left: Record<string, number> = { west: 0, north: 1, south: 2, east: 3, ghost: 4, materialize: 4 }, center: Record<string, number> = { normal: 0, happy: 1, sad: 2, mad: 3, wave: 4, bow: 5, shrug: 6, present: 7, jump: 8, react: 9 }, right: Record<string, number> = { 'turn-left': 0, 'turn-right': 1, 'turn-around': 2, time: 3, tokens: 4 };
             control.classList.add('native-positioned-tool');
             if (name in left)
                 control.style.left = `${left[name] * 29 + 2}px`;
@@ -1067,9 +1089,11 @@ function installNativeChrome() {
                     $('#chat-to').value = '';
                     $('#chat-text').focus();
                 }
-                else
+                else if (!$('#chat-to').value.trim())
                     $('#chat-to').focus();
-                if (channel === 'think' && $('#chat-text').value.trim() || channel === 'esp' && $('#chat-to').value.trim() && $('#chat-text').value.trim())
+                else
+                    $('#chat-text').focus();
+                if (['say', 'think'].includes(channel) && $('#chat-text').value.trim() || channel === 'esp' && $('#chat-to').value.trim() && $('#chat-text').value.trim())
                     $('#chat-form').requestSubmit();
             }
         }
@@ -1102,7 +1126,7 @@ function installNativeChrome() {
     title.addEventListener('pointerdown', (event: any) => { if (event.target.closest('button'))
         return; const rect = $('#native-window').getBoundingClientRect(); drag = { x: event.clientX - rect.left, y: event.clientY - rect.top }; title.setPointerCapture(event.pointerId); });
     title.addEventListener('pointermove', (event: any) => { if (!drag)
-        return; const frame = $('#native-window'); frame.style.position = 'absolute'; frame.style.margin = '0'; frame.style.left = `${Math.max(0, Math.min(innerWidth - 100, event.clientX - drag.x))}px`; frame.style.top = `${Math.max(0, event.clientY - drag.y)}px`; });
+        return; const frame = $('#native-window'); frame.style.position = 'absolute'; frame.style.margin = '0'; frame.style.left = `${Math.max(0, Math.min(innerWidth - 100, event.clientX - drag.x))}px`; frame.style.top = `${Math.max(clientBanner.offsetHeight, event.clientY - drag.y) + scrollY}px`; });
     title.addEventListener('pointerup', () => { drag = null; });
 }
 function sceneSelect(object: WorldObject | null, walkDestination?: readonly number[]) {

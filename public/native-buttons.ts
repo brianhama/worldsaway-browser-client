@@ -3,14 +3,14 @@
 const controls: Record<string, string> = {
     west: '00', north: '01', south: '02', east: '03', ghost: '04', materialize: '05',
     normal: '06', happy: '07', sad: '08', mad: '09', wave: '10', bow: '11',
-    shrug: '12', show: '13', jump: '14', stomp: '15', drop: '16', pockets: '17',
-    inventory: '18', time: '19', tokens: '20',
+    shrug: '12', present: '13', jump: '14', react: '15', 'turn-left': '16', 'turn-right': '17',
+    'turn-around': '18', time: '19', tokens: '20',
 };
 const speech: Record<string, string> = { say: '00', think: '01', esp: '02', mail: '02' };
 const symbols: Record<string, string> = {
     west: '←', north: '↑', south: '↓', east: '→', ghost: '○', materialize: '♙',
     normal: '·', happy: '☺', sad: '☹', mad: '!', wave: '↗', bow: '↘', shrug: '?',
-    show: '↔', jump: '⇧', stomp: '⇩', drop: '⇓', pockets: '▣', inventory: '▤',
+    present: '↔', jump: '⇧', react: '⇩', 'turn-left': '↶', 'turn-right': '↷', 'turn-around': '↵',
     time: '◷', tokens: '◉', say: 'S', think: 'T', esp: 'E', mail: 'M',
 };
 
@@ -19,7 +19,9 @@ interface NativeButton {
     button: HTMLButtonElement;
     base: string;
     speech: boolean;
-    pressed: boolean;
+    pointerId: number | null;
+    pointerInside: boolean;
+    activationKey: string | null;
     fallback: boolean;
     symbol: string;
 }
@@ -31,12 +33,16 @@ function fallbackImage(symbol: string, pressed: boolean): string {
 
 function render(entry: NativeButton): void {
     const { image, button } = entry;
-    const pressed = !button.disabled && (entry.pressed || button.classList.contains('active'));
-    // Controls have explicit embossed disabled cells. The speech strip's extra
-    // columns are dark/pressed variants, so keep its raised cell when disabled.
-    const state = button.disabled ? (entry.speech ? 0 : 4) : pressed ? 1 : 0;
-    const src = entry.fallback ? fallbackImage(entry.symbol, pressed)
+    const focused = button.matches(':focus-visible'), selected = button.classList.contains('active');
+    const pressed = !button.disabled && (entry.pointerId !== null && entry.pointerInside
+        || entry.activationKey !== null || !entry.speech && selected);
+    // Columns 2/3 supply the native keyboard-focus mark. Controls also have
+    // embossed disabled cells at 4/5; speech uses 4–7 for selected states.
+    const state = button.disabled ? (entry.speech ? (focused ? 2 : 0) : focused ? 5 : 4)
+        : (focused ? 2 : 0) + (pressed ? 1 : 0) + (entry.speech && selected ? 4 : 0);
+    const src = entry.fallback ? fallbackImage(entry.symbol, pressed || selected)
         : `${entry.base}${state ? `-state-${state}` : ''}.png`;
+    button.classList.toggle('native-button-bitmap-focus', focused && !entry.fallback);
     image.classList.toggle('native-button-dimmed', button.disabled && (entry.speech || entry.fallback));
     if (image.getAttribute('src') !== src) image.src = src;
 }
@@ -51,7 +57,8 @@ export function installNativeButtonImages(root: ParentNode = document): void {
         const isSpeech = !(name in controls);
         const entry: NativeButton = {
             image, button, base: `/native-icons/${isSpeech ? 'speech' : 'control'}-${isSpeech ? speech[name] : controls[name]}`,
-            speech: isSpeech, pressed: false, fallback: false, symbol: symbols[name] ?? '·',
+            speech: isSpeech, pointerId: null, pointerInside: false, activationKey: null,
+            fallback: false, symbol: symbols[name] ?? '·',
         };
         entries.set(button, entry);
         image.width = 29;
@@ -62,27 +69,71 @@ export function installNativeButtonImages(root: ParentNode = document): void {
             entry.fallback = true;
             render(entry);
         }, { once: true });
-        const press = (pressed: boolean) => { entry.pressed = pressed; render(entry); };
-        button.addEventListener('pointerdown', event => { if (event.button === 0) press(true); });
-        button.addEventListener('pointerleave', () => press(false));
-        button.addEventListener('pointerenter', event => { if (event.buttons === 1) press(true); });
-        button.addEventListener('pointercancel', () => press(false));
-        button.addEventListener('keydown', event => { if (event.key === ' ' || event.key === 'Enter') press(true); });
-        button.addEventListener('keyup', () => press(false));
-        button.addEventListener('blur', () => press(false));
+        button.addEventListener('pointerdown', event => {
+            if (!button.disabled && event.button === 0 && entry.pointerId === null) {
+                entry.pointerId = event.pointerId;
+                entry.pointerInside = true;
+                render(entry);
+            }
+        });
+        button.addEventListener('pointerleave', event => {
+            if (entry.pointerId === event.pointerId) { entry.pointerInside = false; render(entry); }
+        });
+        button.addEventListener('pointerenter', event => {
+            // Dragging across another button never presses it. Only a press
+            // that began on this button may be resumed after leaving it.
+            if (entry.pointerId === event.pointerId) {
+                entry.pointerInside = Boolean(event.buttons & 1);
+                if (!entry.pointerInside) entry.pointerId = null;
+                render(entry);
+            }
+        });
+        button.addEventListener('keydown', event => {
+            if (!button.disabled && (event.key === ' ' || event.key === 'Enter') && entry.activationKey === null) {
+                entry.activationKey = event.key;
+            }
+            render(entry);
+        });
+        button.addEventListener('keyup', event => {
+            if (event.key === entry.activationKey) { entry.activationKey = null; render(entry); }
+        });
+        button.addEventListener('focus', () => render(entry));
+        button.addEventListener('blur', () => { cancelPress(entry); render(entry); });
         render(entry);
     }
-    const release = () => { for (const entry of entries.values()) { entry.pressed = false; render(entry); } };
-    window.addEventListener('pointerup', release);
-    window.addEventListener('pointercancel', release);
-    window.addEventListener('blur', release);
+    const releasePointer = (event: PointerEvent) => {
+        for (const entry of entries.values()) {
+            if (entry.pointerId !== event.pointerId) continue;
+            entry.pointerId = null;
+            entry.pointerInside = false;
+            render(entry);
+        }
+    };
+    window.addEventListener('pointerup', releasePointer, { capture: true });
+    window.addEventListener('pointercancel', releasePointer, { capture: true });
+    window.addEventListener('blur', () => {
+        for (const entry of entries.values()) { cancelPress(entry); render(entry); }
+    });
+    // A focused button can gain or lose :focus-visible when the user changes
+    // input methods without moving focus. Read the browser's final state.
+    const refreshFocus = () => queueMicrotask(() => {
+        for (const entry of entries.values()) render(entry);
+    });
+    window.addEventListener('keydown', refreshFocus, { capture: true });
+    window.addEventListener('pointerdown', refreshFocus, { capture: true });
     // Disabled states also change after exit availability and Tcl updates. Watch
     // the final DOM attributes instead of rendering an intermediate snapshot.
     const observer = new MutationObserver(records => {
         for (const button of new Set(records.map(record => record.target as HTMLButtonElement))) {
             const entry = entries.get(button);
-            if (entry) { if (button.disabled) entry.pressed = false; render(entry); }
+            if (entry) { if (button.disabled) cancelPress(entry); render(entry); }
         }
     });
     for (const button of entries.keys()) observer.observe(button, { attributes: true, attributeFilter: ['disabled', 'class'] });
+}
+
+function cancelPress(entry: NativeButton): void {
+    entry.pointerId = null;
+    entry.pointerInside = false;
+    entry.activationKey = null;
 }
