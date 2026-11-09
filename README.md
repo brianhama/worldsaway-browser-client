@@ -68,9 +68,10 @@ npm start -- --client-dir /path/to/AltAway --port 4174
 `ALTAWAY_CLIENT_DIR` selects the same cache. An explicit missing or invalid cache
 reports an error. Caches are read only; received resources and session state stay
 in process memory. Original cache files and proprietary UI extracts are excluded
-from the source distribution. The interface uses system fonts and loads the
-original Windows button images when they are supplied locally; otherwise it
-uses authored SVG controls.
+from the source distribution. The interface uses system fonts. Git checkouts
+include the original Windows toolbar and speech button images so deployments
+from GitHub preserve the Windows interface. Source-only release archives omit
+those images and use authored SVG controls until the images are supplied.
 
 To use the Windows client's toolbar and speech buttons, extract the images from
 a `wa32.exe` you are entitled to use, then rebuild:
@@ -80,11 +81,14 @@ npx tsx scripts/asset-toolbar.ts /path/to/wa32.exe
 npm run build
 ```
 
-The extraction writes `public/native-icons/`. The build copies only the known
-button PNGs and their image states into `dist/public/native-icons/`. These
-optional images are also included when building a Docker image from that local
-tree. They remain ignored by Git and excluded from `release:prepare` source
-archives; the executable, cache, fonts, and other extracts are not bundled.
+The extraction writes `public/native-icons/`. The build copies only the 150
+known button PNGs and their image states into `dist/public/native-icons/`.
+These files are tracked in Git and included in Docker images. Docker builds
+use `npm run build -- --require-native-buttons` to reject missing or incomplete
+button artwork before publishing a build. The images retain their original
+owners' rights; see `THIRD_PARTY_NOTICES.md`. They remain excluded from
+`release:prepare` source archives; the executable, cache, fonts, and other
+extracts are not bundled.
 
 ## Tcl runtime
 
@@ -246,16 +250,19 @@ npm run release:prepare
 ```
 
 This produces `release/browser-client-0.3.0/`, a `.tar.gz` source archive,
-and its SHA-256 file. The staged directory is the intended public repository
-root. Its `SOURCE_MANIFEST.json` records per-file hashes. The exporter uses a
+and its SHA-256 file. The staged directory is a source-only distribution root.
+Its `SOURCE_MANIFEST.json` records per-file hashes. The exporter uses a
 positive allowlist and checks selected inputs for common private-key/token and
 personal-path patterns. It excludes original resources, UI extracts, research
 screenshots, deployment metadata, local tests, logs, credentials, runtime
 binaries, and sibling projects. This scan is a release safeguard, not a proof
 that arbitrary future additions are secret-free.
 
-Use that staged directory or extracted archive when initializing the public
-repository. Do not publish the containing reverse-engineering workspace. No
+Use that staged directory or extracted archive when initializing a source-only
+public repository. A repository used for hosted Windows-style deployments also
+needs the 150 allowed `public/native-icons/` PNGs from the maintained Git tree;
+the strict Docker build checks this requirement. Do not publish the containing
+reverse-engineering workspace. No
 remote repository is created by the preparation command. `private: true` in
 `package.json` prevents accidental npm registry publication; it does not
 restrict use of the MIT-licensed source. CI builds on Node 22 and 24, installs

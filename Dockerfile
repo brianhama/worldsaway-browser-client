@@ -7,7 +7,7 @@ COPY public/ public/
 COPY server/ server/
 COPY native/ native/
 COPY scripts/ scripts/
-RUN npm run build
+RUN npm run build -- --require-native-buttons
 
 FROM node:24-bookworm-slim AS tcl-build
 RUN apt-get update && apt-get install -y --no-install-recommends build-essential ca-certificates zlib1g-dev && rm -rf /var/lib/apt/lists/*

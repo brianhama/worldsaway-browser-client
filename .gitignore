@@ -34,9 +34,15 @@ Thumbs.db
 __pycache__/
 *.pyc
 
-# Supplied client caches and proprietary UI extracts are local inputs.
+# Supplied client caches and unrelated UI extracts remain local inputs.
 /assets/
-/public/native-icons/
+/public/native-icons/*
+!/public/native-icons/control-[01][0-9].png
+!/public/native-icons/control-20.png
+!/public/native-icons/control-[01][0-9]-state-[1-5].png
+!/public/native-icons/control-20-state-[1-5].png
+!/public/native-icons/speech-0[0-2].png
+!/public/native-icons/speech-0[0-2]-state-[1-7].png
 /public/native-font*
 /public/client.ico
 

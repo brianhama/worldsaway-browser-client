@@ -9,7 +9,7 @@ const top = new Set(['package.json','package-lock.json','tsconfig.json','README.
   'LICENSE','THIRD_PARTY_NOTICES.md','CONTRIBUTING.md','SECURITY.md',
   '.gitignore','.editorconfig','.env.example','.dockerignore','Dockerfile']);
 const sourceTools = new Set(['build.ts','check.ts','paths.ts','release.ts',
-  'setup-tcl.ts','asset-toolbar.ts']);
+  'setup-tcl.ts','asset-toolbar.ts','native-button-assets.ts']);
 /** Decide source-release membership independently of Git tracking and ignore rules. */
 export function isReleaseFile(file: string): boolean {
   return top.has(file) || /^(public|native)\/[^/]+\.ts$/.test(file)

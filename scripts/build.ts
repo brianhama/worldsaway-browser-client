@@ -1,8 +1,14 @@
 /** Compile checked ESM and copy web assets plus optional native button images. */
 import {spawnSync} from 'node:child_process';
-import {mkdir,readdir,copyFile,rm} from 'node:fs/promises';
+import {mkdir,readdir,copyFile,rm,writeFile} from 'node:fs/promises';
 import {join} from 'node:path';
 import {projectRoot} from './paths.js';
+import {loadNativeButtons} from './native-button-assets.js';
+const args=process.argv.slice(2);
+if(args.some(arg=>arg!=='--require-native-buttons'))throw new Error('Usage: npm run build -- [--require-native-buttons]');
+// Validate and retain the complete artwork before touching the previous build.
+// Production must never silently replace Windows buttons with placeholders.
+const nativeButtons=await loadNativeButtons(join(projectRoot,'public/native-icons'),{required:args.includes('--require-native-buttons')});
 // Clear old output first: a renamed or deleted source module must not remain
 // runnable as stale JavaScript and conceal a broken clean-checkout build.
 await rm(join(projectRoot,'dist'),{recursive:true,force:true});
@@ -15,24 +21,12 @@ await mkdir(join(projectRoot,'dist/public'),{recursive:true});
 for(const file of await readdir(join(projectRoot,'public'))){
   if(/\.(html|css|svg)$/.test(file)) await copyFile(join(projectRoot,'public',file),join(projectRoot,'dist/public',file));
 }
-// Button images are supplied separately from the source release. Include only
-// the known complete controls and their states, never arbitrary local extracts.
-const nativeIcons=join(projectRoot,'public/native-icons');
-const iconFiles=await readdir(nativeIcons,{withFileTypes:true}).catch((error: NodeJS.ErrnoException)=>{
-  if(error.code==='ENOENT')return [];
-  throw error;
-});
-let nativeIconCount=0;
-for(const item of iconFiles){
-  if(!item.isFile()||!/^(?:control-(?:[01][0-9]|20)(?:-state-[1-5])?|speech-0[0-2](?:-state-[1-7])?)\.png$/.test(item.name))continue;
-  const destination=join(projectRoot,'dist/public/native-icons');
-  if(nativeIconCount===0)await mkdir(destination,{recursive:true});
-  await copyFile(join(nativeIcons,item.name),join(destination,item.name));
-  nativeIconCount++;
-}
+// Copy only the validated cells, never arbitrary neighboring local extracts.
+if(nativeButtons.length)await mkdir(join(projectRoot,'dist/public/native-icons'),{recursive:true});
+for(const {name,bytes} of nativeButtons)await writeFile(join(projectRoot,'dist/public/native-icons',name),bytes);
 // Tcl workers are source assets, not TypeScript modules, and need an explicit copy.
 await mkdir(join(projectRoot,'dist/server'),{recursive:true});
 for(const file of await readdir(join(projectRoot,'server'))){
   if(file.endsWith('.tcl')) await copyFile(join(projectRoot,'server',file),join(projectRoot,'dist/server',file));
 }
-console.log(`Built TypeScript server, native codecs, browser modules, static assets, and ${nativeIconCount} optional native button images.`);
+console.log(`Built TypeScript server, native codecs, browser modules, static assets, and ${nativeButtons.length} native button images.`);

@@ -24,11 +24,13 @@ not part of the open-source export. Supply caches you are entitled to use via
 `ALTAWAY_CLIENT_DIR` or `--client-dir`; these resources retain their owners'
 rights. Received world resources are processed in memory during a session.
 
-Locally supplied Windows toolbar and speech button PNGs may be copied into a
-built application or Docker image from `public/native-icons/`. This is optional
-and does not add those images to the MIT-licensed source distribution or change
-their owners' rights. The extraction tool reads a separately supplied
-`wa32.exe`; the executable itself is not included in the application build.
+The Git repository includes the 150 Windows toolbar and speech button PNGs in
+`public/native-icons/` so GitHub-based deployments retain the original buttons.
+These images are copied into application and Docker builds, retain their
+original owners' rights, and are not covered by the MIT license. The
+`release:prepare` source-only export continues to omit them. The extraction tool
+reads a separately supplied `wa32.exe`; the executable itself is not included
+in the application build.
 
 The authored renderer contains numeric palette lookup values and protocol
 constants used for interoperability. These do not grant rights to any images,
